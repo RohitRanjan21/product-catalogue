@@ -12,7 +12,7 @@ import { pino } from 'pino';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp, type AppDeps } from '../src/app';
 import { UpstreamError } from '../src/errors';
-import { InMemoryProductSource, RecordingEmailSender } from './fakes';
+import { FAKE_PNG, InMemoryProductSource, RecordingEmailSender } from './fakes';
 
 const ProductListSchema = ProductSchema.array();
 
@@ -145,6 +145,38 @@ describe('GET /api/products/:id', () => {
   it.each(['abc', '0', '1.5'])('400s for id %j', async (id) => {
     const { app } = await setup();
     expectError(await app.inject(`/api/products/${id}`), 400, 'VALIDATION_ERROR');
+  });
+});
+
+describe('product images', () => {
+  it("never exposes the source's image URL: every product points at our image endpoint", async () => {
+    const { app } = await setup();
+    const featured = ProductListSchema.parse((await app.inject('/api/products/featured')).json());
+    expect(featured.map((p) => p.imageUrl)).toEqual([8, 3, 4, 6, 1].map((id) => `/api/products/${id}/image`));
+    const response = await app.inject('/api/products/3');
+    expect(response.body).not.toContain('images.example.com');
+  });
+
+  it('serves the image bytes with a safe content type and caching', async () => {
+    const { app } = await setup();
+    const response = await app.inject('/api/products/3/image');
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toBe('image/png');
+    expect(response.headers['cache-control']).toBe('public, max-age=86400');
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(new Uint8Array(response.rawPayload)).toEqual(FAKE_PNG);
+  });
+
+  it('404s for an unknown product and 400s for a bad id', async () => {
+    const { app } = await setup();
+    expectError(await app.inject('/api/products/999/image'), 404, 'NOT_FOUND');
+    expectError(await app.inject('/api/products/abc/image'), 400, 'VALIDATION_ERROR');
+  });
+
+  it('502s when the source cannot provide the image', async () => {
+    const { app, productSource } = await setup();
+    productSource.failWith = new UpstreamError('The product image is unavailable right now.');
+    expectError(await app.inject('/api/products/3/image'), 502, 'UPSTREAM_ERROR');
   });
 });
 

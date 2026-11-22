@@ -12,7 +12,7 @@ function product(id: number, title: string, category: Category, rate: number, pr
     price,
     description: `About ${title}`,
     category,
-    imageUrl: `https://images.example.com/${id}.png`,
+    imageUrl: `/api/products/${id}/image`,
     rating: { rate, count: 100 + id },
   };
 }

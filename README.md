@@ -10,7 +10,8 @@ that can be replaced without touching the rest.
 
 ## Run it (one command)
 
-Needs **Docker** with Compose v2. Nothing else: no accounts, keys or paid services.
+Needs **Docker** with Compose 2.24 or newer (Docker Desktop 4.27+). Nothing else: no accounts, keys or paid
+services.
 
 ```bash
 docker compose up --build        # or: npm start
@@ -59,7 +60,7 @@ No secrets are committed (`.env` is git-ignored).
 
 ```
 Browser (React SPA)
-   |  only /api/*  (same origin; the CSP blocks any other API call)
+   |  only our own origin, images included (the CSP blocks every other host)
    v
 nginx (web container) ── serves the SPA, proxies /api
    |
@@ -74,7 +75,8 @@ API (Fastify)
                                    stale-on-error)
 ```
 
-- The client never calls Fake Store. It only knows our `/api` contract.
+- The client never calls Fake Store, not even for images: the API serves them at
+  `/api/products/:id/image`, and the source's image URLs never leave the API.
 - Routes know nothing about Fake Store or SMTP; services depend only on the two ports.
 - Fake Store's shape is mapped to our `Product` in one file (the adapter). Swapping the product source
   means writing one new adapter and changing one line in `apps/api/src/server.ts`.
@@ -90,6 +92,7 @@ API (Fastify)
 | GET | `/api/categories/:slug/products` | `{category, topRated (3 best rated), more}` |
 | GET | `/api/products/search?q=term` | products whose title, description or category contain the term |
 | GET | `/api/products/:id` | `Product` |
+| GET | `/api/products/:id/image` | the product image, fetched from the source by the API |
 | POST | `/api/enquiries` | `202 {enquiryId}`; emails the sales inbox |
 
 Every error is `{error: {code, message, details?}}` with 400 / 404 / 429 / 502 / 500. No stack traces or
@@ -99,17 +102,17 @@ upstream bodies reach the client. Full contract: `packages/contracts/src`.
 
 ```bash
 npm ci
-npm run lint && npm run typecheck && npm test   # 125 tests, ~5 seconds, no network or Docker needed
+npm run lint && npm run typecheck && npm test   # 138 tests, ~5 seconds, no network or Docker needed
 docker compose up --build -d --wait && npm run test:e2e   # Playwright against the running stack
 ```
 
 | Level | Where | What it covers |
 |---|---|---|
 | Contract | `packages/contracts` (19) | Input rules: enquiry strictness, search term, product id |
-| Unit + adapter | `apps/api/src/**/*.test.ts` | Featured order, top-rated split and tie-breaks, search matching, config validation, enquiry email content, Fake Store mapping/cache/timeout/failures (stubbed `fetch`), SMTP failures |
-| Integration | `apps/api/test/app.test.ts` | Every route through Fastify with in-memory fakes: success, 400, 404, 413, 429, 502, 500, no stack leaks, no customer details in logs |
+| Unit + adapter | `apps/api/src/**/*.test.ts` | Featured order, top-rated split and tie-breaks, search matching, config validation, enquiry email content, Fake Store mapping/cache/timeout/failures and image checks (type, size; stubbed `fetch`), SMTP failures |
+| Integration | `apps/api/test/app.test.ts` | Every route through Fastify with in-memory fakes: success, 400, 404, 413, 429, 502, 500, no stack leaks, no source image URLs or customer details leaking |
 | Component | `apps/web/src/**/*.test.tsx` (23) | The acceptance criteria in the UI, with MSW standing in for the API; unhandled requests fail the test |
-| End to end | `e2e/tests` (5) | Real stack and real Fake Store: home → category → product → enquiry → thank you, the email arriving in Mailpit, search, CSP and no foreign API calls or console errors |
+| End to end | `e2e/tests` (5) | Real stack and real Fake Store: home → category → product → enquiry → thank you, the email arriving in Mailpit, search, images loading through our API, CSP, and no request to any other host or console error |
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on every pull request, then the
 end-to-end suite against Docker Compose.

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RecordingLogger } from '../../test/fakes';
 import { UpstreamError } from '../errors';
-import { FakeStoreProductSource, toCategory } from './fake-store-product-source';
+import { FakeStoreProductSource, MAX_IMAGE_BYTES, toCategory } from './fake-store-product-source';
 
 /** Trimmed copies of real Fake Store items (checked 2026-11-22), including the trailing space. */
 const upstreamProducts = [
@@ -169,5 +169,56 @@ describe('FakeStoreProductSource failures', () => {
     const error = await source.listProducts().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(UpstreamError);
     expect((error as UpstreamError).cause).toMatchObject({ name: 'TimeoutError' });
+  });
+});
+
+describe('FakeStoreProductSource.getProductImage', () => {
+  const imageUrl = upstreamProducts[0]!.image;
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+
+  /** Serves the catalogue from /products and answers image requests with `image()`. */
+  function withImage(image: () => Response | Promise<Response>) {
+    return vi.fn<typeof fetch>((input) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      return Promise.resolve(url.endsWith('/products') ? json(upstreamProducts) : image());
+    });
+  }
+
+  it("fetches the image from the URL in the catalogue and returns its bytes and type", async () => {
+    const fetchFn = withImage(() => new Response(png, { headers: { 'content-type': 'image/png; charset=binary' } }));
+    const { source } = setup(fetchFn);
+
+    expect(await source.getProductImage(2)).toEqual({ contentType: 'image/png', data: png });
+    expect(fetchFn).toHaveBeenLastCalledWith(imageUrl, expect.anything());
+  });
+
+  it('returns undefined for an unknown product without fetching anything else', async () => {
+    const fetchFn = withImage(() => new Response(png));
+    const { source } = setup(fetchFn);
+    expect(await source.getProductImage(999)).toBeUndefined();
+    expect(fetchFn).toHaveBeenCalledTimes(1); // only the catalogue
+  });
+
+  const failures: [string, () => Response | Promise<Response>][] = [
+    ['an SVG (could carry script)', () => new Response('<svg/>', { headers: { 'content-type': 'image/svg+xml' } })],
+    ['an HTML error page', () => new Response('<html/>', { headers: { 'content-type': 'text/html' } })],
+    ['no content type', () => new Response(png)],
+    ['a non-2xx status', () => new Response('gone', { status: 404, headers: { 'content-type': 'image/png' } })],
+    [
+      'a declared size over the limit',
+      () => new Response(png, { headers: { 'content-type': 'image/png', 'content-length': String(MAX_IMAGE_BYTES + 1) } }),
+    ],
+    [
+      'an actual size over the limit',
+      () => new Response(new Uint8Array(MAX_IMAGE_BYTES + 1), { headers: { 'content-type': 'image/jpeg' } }),
+    ],
+    ['a network error', () => Promise.reject(new TypeError('fetch failed'))],
+  ];
+
+  it.each(failures)('refuses %s with an UpstreamError', async (_label, image) => {
+    const { source } = setup(withImage(image));
+    const error = await source.getProductImage(2).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UpstreamError);
+    expect((error as UpstreamError).message).toBe('The product image is unavailable right now.');
   });
 });

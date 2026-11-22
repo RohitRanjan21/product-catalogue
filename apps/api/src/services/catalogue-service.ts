@@ -1,6 +1,6 @@
-import type { Category, CategoryProducts, Product } from '@catalogue/contracts';
+import type { Category } from '@catalogue/contracts';
 import { NotFoundError } from '../errors';
-import type { Logger, ProductSource } from '../ports';
+import type { Logger, ProductImage, ProductSource, SourceProduct } from '../ports';
 
 /** How many products a category page shows as "Top rated" (A2). */
 export const TOP_RATED_PER_CATEGORY = 3;
@@ -12,6 +12,12 @@ export interface CatalogueServiceDeps {
   log: Logger;
 }
 
+export interface CategoryWithProducts {
+  category: Category;
+  topRated: SourceProduct[];
+  more: SourceProduct[];
+}
+
 export class CatalogueService {
   constructor(private readonly deps: CatalogueServiceDeps) {}
 
@@ -20,7 +26,7 @@ export class CatalogueService {
   }
 
   /** Featured products in configured order. Ids the source no longer has are skipped and logged. */
-  async getFeatured(): Promise<Product[]> {
+  async getFeatured(): Promise<SourceProduct[]> {
     const byId = new Map((await this.deps.productSource.listProducts()).map((p) => [p.id, p]));
     const featured = this.deps.featuredProductIds.flatMap((id) => byId.get(id) ?? []);
     const missingIds = this.deps.featuredProductIds.filter((id) => !byId.has(id));
@@ -31,7 +37,7 @@ export class CatalogueService {
   }
 
   /** The best rated products of a category as "topRated", the rest as "more", all by rating (A2). */
-  async getCategoryProducts(slug: string): Promise<CategoryProducts> {
+  async getCategoryProducts(slug: string): Promise<CategoryWithProducts> {
     const [categories, products] = await Promise.all([
       this.deps.productSource.listCategories(),
       this.deps.productSource.listProducts(),
@@ -48,24 +54,30 @@ export class CatalogueService {
   }
 
   /** Products whose title, description or category contain the term, ignoring case (A3). */
-  async search(term: string): Promise<Product[]> {
+  async search(term: string): Promise<SourceProduct[]> {
     const products = await this.deps.productSource.listProducts();
     return products.filter((product) => matchesSearchTerm(product, term));
   }
 
-  async getProduct(id: number): Promise<Product> {
+  async getProduct(id: number): Promise<SourceProduct> {
     const product = await this.deps.productSource.getProduct(id);
     if (!product) throw new NotFoundError(`Product ${id} was not found`);
     return product;
   }
+
+  async getProductImage(id: number): Promise<ProductImage> {
+    const image = await this.deps.productSource.getProductImage(id);
+    if (!image) throw new NotFoundError(`Product ${id} was not found`);
+    return image;
+  }
 }
 
 /** Higher rating first; ties go to the product with more reviews, then the lower id. */
-export function byRatingDesc(a: Product, b: Product): number {
+export function byRatingDesc(a: SourceProduct, b: SourceProduct): number {
   return b.rating.rate - a.rating.rate || b.rating.count - a.rating.count || a.id - b.id;
 }
 
-export function matchesSearchTerm(product: Product, term: string): boolean {
+export function matchesSearchTerm(product: SourceProduct, term: string): boolean {
   const needle = term.trim().toLowerCase();
   if (needle === '') return false;
   return [product.title, product.description, product.category.name].some((text) =>

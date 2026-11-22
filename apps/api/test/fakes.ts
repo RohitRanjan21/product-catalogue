@@ -1,5 +1,5 @@
-import type { Category, Product } from '@catalogue/contracts';
-import type { EmailMessage, EmailSender, Logger, ProductSource } from '../src/ports';
+import type { Category } from '@catalogue/contracts';
+import type { EmailMessage, EmailSender, Logger, ProductImage, ProductSource, SourceProduct } from '../src/ports';
 
 const categories = {
   electronics: { slug: 'electronics', name: 'Electronics' },
@@ -12,8 +12,8 @@ export function makeProduct(
   category: Category,
   rate: number,
   count: number,
-  overrides: Partial<Product> = {},
-): Product {
+  overrides: Partial<SourceProduct> = {},
+): SourceProduct {
   return {
     id,
     title: `Product ${id}`,
@@ -30,7 +30,7 @@ export function makeProduct(
  * A small catalogue with more than 3 products in one category and a rating tie (4 and 6) where
  * the higher id has more reviews, so only the review-count rule (not the id fallback) orders them.
  */
-export const fixtureProducts: Product[] = [
+export const fixtureProducts: SourceProduct[] = [
   makeProduct(1, categories.mens, 3.9, 120, { title: 'Everyday Backpack' }),
   makeProduct(2, categories.mens, 4.1, 259, { title: 'Slim Fit T-Shirt' }),
   makeProduct(3, categories.mens, 4.7, 500, { title: 'Cotton Jacket' }),
@@ -44,13 +44,16 @@ export const fixtureProducts: Product[] = [
   makeProduct(8, categories.jewelery, 4.6, 400, { title: 'Silver Ring' }),
 ];
 
+/** The 8-byte PNG signature: enough to recognise in a response. */
+export const FAKE_PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
 export class InMemoryProductSource implements ProductSource {
   /** When set, every call rejects with this error (simulates the upstream being down). */
   failWith: Error | undefined;
 
-  constructor(public products: Product[] = fixtureProducts) {}
+  constructor(public products: SourceProduct[] = fixtureProducts) {}
 
-  listProducts(): Promise<Product[]> {
+  listProducts(): Promise<SourceProduct[]> {
     return this.result(() => this.products);
   }
 
@@ -61,8 +64,15 @@ export class InMemoryProductSource implements ProductSource {
     });
   }
 
-  getProduct(id: number): Promise<Product | undefined> {
+  getProduct(id: number): Promise<SourceProduct | undefined> {
     return this.result(() => this.products.find((p) => p.id === id));
+  }
+
+  /** Every product has the same tiny "image"; unknown ids resolve to undefined. */
+  getProductImage(id: number): Promise<ProductImage | undefined> {
+    return this.result(() =>
+      this.products.some((p) => p.id === id) ? { contentType: 'image/png', data: FAKE_PNG } : undefined,
+    );
   }
 
   private result<T>(value: () => T): Promise<T> {

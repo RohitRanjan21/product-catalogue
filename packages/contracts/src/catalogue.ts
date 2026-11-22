@@ -14,7 +14,11 @@ export const ProductSchema = z.object({
   price: z.number().nonnegative(),
   description: z.string(),
   category: CategorySchema,
-  imageUrl: z.url(),
+  /**
+   * Where the client loads the image from: our own API (`/api/products/:id/image`), never the
+   * product source's host, so the browser only talks to us (DECISIONS.md A12).
+   */
+  imageUrl: z.string().regex(/^\/api\/products\/\d+\/image$/, 'Image must be served by our API'),
   rating: z.object({
     rate: z.number().min(0).max(5),
     count: z.number().int().nonnegative(),

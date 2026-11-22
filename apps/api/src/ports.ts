@@ -5,10 +5,24 @@ import type { Category, Product } from '@catalogue/contracts';
  * Services depend on this interface only; upstream shapes are mapped inside the adapter.
  */
 export interface ProductSource {
-  listProducts(): Promise<Product[]>;
+  listProducts(): Promise<SourceProduct[]>;
   listCategories(): Promise<Category[]>;
   /** Resolves to undefined when the product does not exist. */
-  getProduct(id: number): Promise<Product | undefined>;
+  getProduct(id: number): Promise<SourceProduct | undefined>;
+  /** The product's image bytes, or undefined when the product does not exist. */
+  getProductImage(id: number): Promise<ProductImage | undefined>;
+}
+
+/**
+ * A product as the source describes it. Same as the API's `Product`, except `imageUrl` is wherever
+ * the source keeps the image. That URL stays inside the API: routes replace it with our own
+ * image endpoint before responding (see `toPublicProduct`).
+ */
+export type SourceProduct = Omit<Product, 'imageUrl'> & { imageUrl: string };
+
+export interface ProductImage {
+  contentType: string;
+  data: Uint8Array;
 }
 
 export interface EmailMessage {

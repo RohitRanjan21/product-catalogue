@@ -16,22 +16,30 @@ function watchConsoleErrors(page: Page): string[] {
   return errors;
 }
 
-/** Records every browser request that is not for our own origin, other than images (DECISIONS.md A12). */
+/** Records every browser request, images included, that is not for our own origin (DECISIONS.md A12). */
 function watchForeignRequests(page: Page, baseURL: string): string[] {
   const foreign: string[] = [];
   const origin = new URL(baseURL).origin;
   page.on('request', (request) => {
-    if (request.resourceType() !== 'image' && new URL(request.url()).origin !== origin) {
-      foreign.push(request.url());
-    }
+    if (new URL(request.url()).origin !== origin) foreign.push(request.url());
   });
   return foreign;
 }
 
-test('home shows the 5 featured products', async ({ page }) => {
+test('home shows the 5 featured products, images served by our API', async ({ page, baseURL }) => {
+  const foreignRequests = watchForeignRequests(page, baseURL!);
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1, name: 'Top rated products' })).toBeVisible();
   await expect(page.getByRole('list', { name: 'Featured products' }).getByRole('link')).toHaveCount(5);
+
+  const images = page.getByRole('list', { name: 'Featured products' }).locator('img');
+  await expect(images).toHaveCount(5);
+  for (const image of await images.all()) {
+    await expect(image).toHaveAttribute('src', /^\/api\/products\/\d+\/image$/);
+    // Loaded for real (the CSP would block anything not from our origin).
+    await expect.poll(() => image.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  }
+  expect(foreignRequests).toEqual([]);
 });
 
 test('search shows only products matching the term', async ({ page, request }) => {
@@ -105,16 +113,17 @@ test('category -> product -> enquiry -> thank you, and the sales inbox gets the 
       { subject: `Product enquiry: ${productTitle}`, to: [SALES_INBOX], replyTo: ['e2e.customer@example.com'] },
     ]);
 
-  // The browser only ever talked to our own origin (plus product images).
+  // The browser only ever talked to our own origin, product images included.
   expect(foreignRequests).toEqual([]);
   // ...and nothing was blocked by the CSP or failed in the console along the way.
   expect(consoleErrors).toEqual([]);
 });
 
-test('security headers are served, and the CSP only allows our own API', async ({ request }) => {
+test('security headers are served, and the CSP only allows our own origin', async ({ request }) => {
   const response = await request.get('/');
   const csp = response.headers()['content-security-policy'] ?? '';
-  expect(csp).toContain("connect-src 'self'");
+  expect(csp).toContain("default-src 'self'");
+  expect(csp).not.toContain('fakestoreapi');
   expect(response.headers()['x-content-type-options']).toBe('nosniff');
 });
 

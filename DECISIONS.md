@@ -24,11 +24,14 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
 - **A10. Search results keep catalogue order.** No relevance ranking; with 20 products it isn't needed.
 - **A11. Enquiries are limited to 5 per minute per client IP** by default (`ENQUIRY_RATE_LIMIT_PER_MINUTE`).
   Catalogue reads are not rate limited.
-- **A12. Product images load from the URL the API returns** (`imageUrl`, today on Fake Store's image host).
-  The browser never calls Fake Store's API: all product *data* comes from our `/api`, and the
-  production CSP (`connect-src 'self'`) blocks any other API call. Images are static assets that would
-  sit on a CDN in production; proxying their bytes through Node would add load for no benefit. If the
-  source changes, the API returns different URLs and the client doesn't change.
+- **A12. Product images are served by our API too** (`/api/products/:id/image`). The brief says the client
+  must not call Fake Store; images live on Fake Store's host, so loading them directly would show
+  `fakestoreapi.com` requests in the browser. The source's image URL never leaves the API: routes
+  replace it with our endpoint, which fetches only images of products in our catalogue (no
+  client-supplied URLs), allows only raster image types (no SVG, which could carry script on our
+  origin), caps size at 5 MB and lets browsers cache for a day. The CSP is now plain `default-src 'self'`,
+  so the browser cannot reach any other host. (First version loaded images from the source's URL;
+  changed after checking the submission against the brief.)
 - **A13. Search starts when the button is clicked (or Enter is pressed)**, not on every keystroke, as the
   criterion describes. The term lives in the URL (`/search?q=`), so results can be shared and reloaded.
 
@@ -64,8 +67,8 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
   (8080) and the inbox UI (8025) are published; the API and SMTP stay on the internal network. All of it
   maps to AWS without code changes (S3/CloudFront or nginx on ECS for `web`, ECS/Fargate or Lambda for
   `api`, SES behind the same `EmailSender` port).
-- **D12. nginx sets security headers**, including a CSP with `connect-src 'self'` (enforces the "client only
-  talks to our API" boundary in the browser), and **overwrites** `X-Forwarded-For` rather than appending
+- **D12. nginx sets security headers**, including a CSP of `default-src 'self'` (the browser itself enforces
+  "the client only talks to our backend", images included), and **overwrites** `X-Forwarded-For` rather than appending
   to it, so the API's per-IP enquiry limit can't be dodged with a forged header (checked by hand: forged
   headers still hit 429 after 5 requests).
 - **D13. Zod runs in `jitless` mode in the browser.** Zod 4 probes `new Function()` for speed; the CSP refuses
@@ -119,4 +122,5 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
 3. OpenAPI generated from the contracts, served at `/api/docs`.
 4. Accessibility pass with axe in the E2E suite, and visual checks once the design arrives.
 5. Metrics and alerts (upstream errors, enquiry failures), and a deploy pipeline to an AWS environment.
-6. Show product images through our own CDN/image service instead of the source's host (A12).
+6. Cache product images on the server side (nginx `proxy_cache` or a CDN in front of the image endpoint);
+   today each cold image is fetched from the source, and only browsers cache it.

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { EnquiryRequest, EnquiryResponse, Product } from '@catalogue/contracts';
+import type { EnquiryRequest, EnquiryResponse } from '@catalogue/contracts';
 import { ValidationError } from '../errors';
-import type { EmailMessage, EmailSender, ProductSource } from '../ports';
+import type { EmailMessage, EmailSender, ProductSource, SourceProduct } from '../ports';
 
 export interface EnquiryServiceDeps {
   productSource: ProductSource;
@@ -36,7 +36,7 @@ export class EnquiryService {
 interface EnquiryEmailInput {
   enquiryId: string;
   enquiry: EnquiryRequest;
-  product: Product;
+  product: SourceProduct;
   to: string;
 }
 
