@@ -140,13 +140,13 @@ docs/PLAN.md         The spec the work was built from
 
 ## Time spent
 
-About **2 hours** of active work, against the 2-3 hour time-box:
+About **2 hours 35 minutes** of active work, against the 2-3 hour time-box:
 
 | Activity | Time |
 |---|---|
 | Planning (reading the brief, choosing the stack, spec, agent instructions, assumptions) | ~25 min |
 | Building (contracts, API, web, Docker, CI) | ~55 min |
 | Testing (writing tests, mutation checks, manual runs against the real stack, E2E) | ~30 min |
-| Reviewing (reading diffs, docs, PR description) | ~15 min |
+| Reviewing (reading diffs, docs, PR description) | ~45 min |
 
 How the time and the AI tooling were used, including what the AI got wrong, is in [AI_USAGE.md](AI_USAGE.md).
