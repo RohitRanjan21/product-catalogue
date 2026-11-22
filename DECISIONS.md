@@ -24,6 +24,13 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
 - **A10. Search results keep catalogue order.** No relevance ranking; with 20 products it isn't needed.
 - **A11. Enquiries are limited to 5 per minute per client IP** by default (`ENQUIRY_RATE_LIMIT_PER_MINUTE`).
   Catalogue reads are not rate limited.
+- **A12. Product images load from the URL the API returns** (`imageUrl`, today on Fake Store's image host).
+  The browser never calls Fake Store's API: all product *data* comes from our `/api`, and the
+  production CSP (`connect-src 'self'`) blocks any other API call. Images are static assets that would
+  sit on a CDN in production; proxying their bytes through Node would add load for no benefit. If the
+  source changes, the API returns different URLs and the client doesn't change.
+- **A13. Search starts when the button is clicked (or Enter is pressed)**, not on every keystroke, as the
+  criterion describes. The term lives in the URL (`/search?q=`), so results can be shared and reloaded.
 
 ## Technical decisions
 - **D1. The `ProductSource` port is small** (`listProducts`, `listCategories`, `getProduct`) and the rules
@@ -45,6 +52,13 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
   through Vite the same way.
 - **D7. Request hardening:** 16 KB body limit, a `x-request-id` response header that matches the request id
   in the logs, and timeouts on every outbound call (Fake Store 5 s, SMTP 10 s).
+- **D8. Web data fetching is TanStack Query hooks in `src/api/hooks.ts`** over one `apiRequest` function that
+  parses every response with the shared contract. Pages are thin; components take data as props.
+  4xx errors are not retried (they won't fix themselves); network and 5xx errors are retried once.
+- **D9. The enquiry form validates with the same `EnquiryRequestSchema` as the API**, so field errors appear
+  before sending, and any field errors the API returns are shown the same way.
+- **D10. Look and feel is CSS variables in `apps/web/src/styles/tokens.css`**, with plain CSS classes in one
+  stylesheet. No UI library: the creative direction isn't decided, and a library would bake one in.
 
 ## Dropped or simplified
 _To be completed._
