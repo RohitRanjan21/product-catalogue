@@ -1,0 +1,40 @@
+# Runs the whole PoC: `docker compose up --build`, then open http://localhost:8080.
+# The sales inbox (Mailpit) is at http://localhost:8025. No accounts or paid services needed.
+name: product-catalogue
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    # Optional: put overrides (featured ids, sales inbox, ...) in .env; see .env.example.
+    env_file:
+      - path: .env
+        required: false
+    # These describe the container network, so they win over .env.
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      TRUST_PROXY: "true"
+    depends_on:
+      mailpit:
+        condition: service_healthy
+    # No published port: the browser reaches the API only through web's /api proxy.
+
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    # SMTP (1025) stays on the internal network; only the inbox UI and its API are published.

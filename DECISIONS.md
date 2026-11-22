@@ -59,6 +59,21 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
   before sending, and any field errors the API returns are shown the same way.
 - **D10. Look and feel is CSS variables in `apps/web/src/styles/tokens.css`**, with plain CSS classes in one
   stylesheet. No UI library: the creative direction isn't decided, and a library would bake one in.
+- **D11. Docker Compose runs three containers:** `web` (nginx serving the built SPA and proxying `/api`),
+  `api` (bundled Node app, non-root, health-checked) and `mailpit` (the local sales inbox). Only `web`
+  (8080) and the inbox UI (8025) are published; the API and SMTP stay on the internal network. All of it
+  maps to AWS without code changes (S3/CloudFront or nginx on ECS for `web`, ECS/Fargate or Lambda for
+  `api`, SES behind the same `EmailSender` port).
+- **D12. nginx sets security headers**, including a CSP with `connect-src 'self'` (enforces the "client only
+  talks to our API" boundary in the browser), and **overwrites** `X-Forwarded-For` rather than appending
+  to it, so the API's per-IP enquiry limit can't be dodged with a forged header (checked by hand: forged
+  headers still hit 429 after 5 requests).
+- **D13. Zod runs in `jitless` mode in the browser.** Zod 4 probes `new Function()` for speed; the CSP refuses
+  it and logs a violation on every page. The flag is set in `src/zod-setup.ts`, imported first, because
+  Zod reads it when schemas are created. The E2E test fails on any console error, so this stays fixed.
+- **D14. E2E runs against the real stack and the real Fake Store.** That is what the reviewer runs, and it
+  checks the email in Mailpit through its API. The trade-off is a dependency on a free public service; CI
+  retries once. With more time: a recorded Fake Store stub for CI, live checks on a schedule.
 
 ## Dropped or simplified
 _To be completed._
