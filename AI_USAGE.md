@@ -1,81 +1,98 @@
 # AI usage
 
-## Tools and models
-I used **Claude Code** (the CLI) with **Claude Opus 5.5** for everything: planning, code, tests and docs.
-No other AI tools. I made the decisions on scope and trade-offs, reviewed the diffs and ran the app.
+## Tools and model
 
-## Agent instruction files (committed)
-- [`AGENTS.md`](AGENTS.md): the rules for any agent working here: the boundaries (the client only talks
-  to our backend; services depend on ports, not on Fake Store or SMTP), coding standards, the workflow,
-  the commands, and a list of pitfalls we hit during the build so the next run doesn't hit them again.
-- [`CLAUDE.md`](CLAUDE.md): one line, `@AGENTS.md`, so Claude Code reads the same rules.
+I built this with Claude Code (the command-line tool) running Claude Opus 5.5. I didn't use any other AI
+tools. The agent wrote the code, tests and most of the docs; I decided what to build, made the calls on
+scope and trade-offs, and pushed back when something looked wrong.
+
+## Agent instruction files
+
+Both are committed to the repo:
+
+- `AGENTS.md` holds the rules every agent run follows: keep the client talking only to our backend, keep
+  Fake Store and SMTP behind ports, validate input with Zod, never log customer details, and run lint,
+  typecheck and tests before calling anything done. It also lists the commands and the pitfalls we ran
+  into, so the next session doesn't trip over them again.
+- `CLAUDE.md` is a single line (`@AGENTS.md`) so Claude Code picks up the same rules.
 
 ## Plan / spec
-[`docs/PLAN.md`](docs/PLAN.md) was written first and agreed before any code: stack, architecture, API
-contract, pages, security basics, test plan and five phases. [`DECISIONS.md`](DECISIONS.md) was updated as
-decisions were made, so each new agent session (and you) work from the same written context. I also kept
-a private handoff note outside the repo (it contained the brief and personal details) so a fresh session
-could pick up from it rather than from memory.
 
-## How I worked with the agent
-- **Plan, then build in phases.** Phase 1 was only the spec, the rules and the first assumptions. Phase 2
-  (contracts + API) ended with a stop so I could review the diff before anything else was built.
-- **Phases 3-5 in one run.** To stay near the time-box I then asked for the web app, packaging/E2E and docs
-  in one go, and reviewed them together afterwards instead of one by one. Each phase is still a separate
-  commit, so the history reads in steps.
-- **A check against the brief.** Once everything was built, I gave the agent the brief, the recruiter's email
-  and the job description and asked it to check the submission against them. That found the image
-  problem below, which I asked it to fix along with two smaller gaps.
-- **"Done" means evidence.** No phase counted as done without `lint`, `typecheck` and the full test run
-  passing, plus runs against the real services (Fake Store, Mailpit, the Docker stack).
+Before any code, I had the agent write `docs/PLAN.md`: the stack, the architecture, the API contract, the
+pages, the security basics, the test plan and five phases. I read it and agreed it first. Decisions and
+assumptions went into `DECISIONS.md` as they came up, not at the end.
 
-## Key prompts that shaped the solution
-1. **"Help me do it"**, with the brief attached. Instead of building straight away, the agent asked me for
-   the decisions that were mine to make: which backend framework, what "top rated" means, how to push,
-   how often to review. My answer on "top rated" became assumptions A1/A2: the home page shows the 5
-   products the owner picks (the criterion says "I have chosen"), category pages rank by rating.
-2. **"Do as per the JD."** The agent first suggested NestJS, which I use day to day. I told it to follow the
-   job description instead. That pointed to testing at every level, CI, observability, agent context files
-   and AWS, so the plan changed to Fastify with explicit ports and adapters, Playwright E2E and CI, and
-   `AGENTS.md` as a proper file rather than an afterthought.
+I also kept a handoff note outside the repo (it had the brief and some personal details in it). When I
+started a new session, the agent read that note plus the spec and rules instead of relying on memory.
+
+## How I worked with it
+
+I started by building in phases with a stop after each one. Phase 1 was just the spec and rules. After
+phase 2 (the contracts and the API) I stopped to look at the diff before going on.
+
+For the rest (the web app, Docker and E2E tests, and the docs), I asked the agent to do all three
+phases in one go to save time. That broke the phase-by-phase rule I'd written in `AGENTS.md`, and the
+agent said so, but it was my call. It still kept a separate commit for each phase and didn't push
+anything.
+
+Once everything was built, I gave the agent the original brief, the recruiter's email and the job
+description and asked it to check the submission against them, line by line. That turned up one real
+problem (images, see below) and a couple of small gaps, which I had it fix.
+
+## Prompts and moments that shaped the solution
+
+1. **"Help me do it"**, with the brief attached. I expected it to start coding. Instead it asked me the
+   questions only I could answer: which backend framework, what "top rated" should mean, how I wanted to
+   push, how often I wanted to review. The "top rated" answer became assumptions A1 and A2: the home page
+   shows the 5 products the owner picks (the criterion literally says "I have chosen"), while category
+   pages rank by rating.
+
+2. **"Do as per the JD."** It first suggested NestJS because that's what I use at work. I told it to follow
+   the job description instead. The JD doesn't name a framework, but it leans hard on testing at every
+   level, CI, observability, agent context files and AWS. So we went with Fastify and explicit ports and
+   adapters, added Playwright and CI to the plan, and treated `AGENTS.md` as a real deliverable.
+
 3. **"Start phase 2 (contracts + API) on a new branch feature/catalogue-poc, following the handoff's
-   guardrails, and stop for my review when phase 2 is done."** A new session that only had the written
-   context. It re-read the spec, rules and decisions first, then built the API and stopped with a guide on
-   what to review.
-4. **"Do all the phases together now, in one go."** My call, to save time. The agent pointed out it went
-   against the phase-by-phase rule in `AGENTS.md`, did it anyway as asked, kept one commit per phase, and
-   still stopped before pushing anything.
-5. **"Let me give you the JD and assessment and you just check if everything is as per asked."** Then
-   **"yes, fix 1, 3 and 4"**. This found that product images were still loaded from Fake Store's host, that
-   `AGENTS.md` hadn't been updated since phase 1, and some small doc drift. All three were fixed.
+   guardrails, and stop for my review when phase 2 is done."** This was a fresh session with only the
+   written notes to go on. It read the spec, rules and decisions first, built the API, and stopped with a
+   short guide on what to look at.
+
+4. **"Do all the phases together now, in one go."** The time-saving decision described above.
+
+5. **"Let me give you the JD and assessment and you just check if everything is as per asked."** Followed
+   by "yes, fix 1, 3 and 4". This is the one I'd point to: it caught a gap that every test was passing
+   straight over.
 
 ## Where the AI got it wrong, and how it was caught
-| What went wrong | How it was caught | Fix |
+
+| What went wrong | How it was caught | What we did |
 |---|---|---|
-| Created the repo in my work projects folder and committed with the machine's global git identity | I stopped it | Recreated in the right folder, with my personal identity set for this repo only |
-| **Product images came from Fake Store's host.** All product data went through our API, but the agent treated images as "just assets" and allowed `fakestoreapi.com` in the CSP. The brief says the client must not call Fake Store, and the browser's network tab would show it | The check against the brief (prompt 5) | Images are now served by our API at `/api/products/:id/image` (only for catalogue products, raster types only, size cap). The CSP allows only our own site, and E2E fails on any request to another host |
-| **A test passed for the wrong reason.** The "equal rating, more reviews wins" test stayed green when that rule was deleted: in the test data the product with more reviews also had the lower id, so the fallback gave the same order | Mutation check (see below) | Test data changed so only the review-count rule gives the right order |
-| **An empty error in the logs.** With the mail server down, the log said only "could not send your enquiry" with no reason. Node reports a refused `localhost` connection as an `AggregateError` with an empty message | A manual run against a stopped Mailpit | The email adapter now writes out the real reasons (`ECONNREFUSED ::1 ...; 127.0.0.1 ...`); tested with that exact error shape |
-| **A test setting silently ignored.** MSW 3 renamed `onUnhandledRequest` to `onUnhandledFrame`. With the old name, a component calling an unexpected endpoint would only have warned, not failed the test | The typecheck; then removing a handler on purpose confirmed tests now fail | Switched to the new name |
-| **Blocked script on every page.** Zod 4 tries `new Function()` to speed up parsing, and our CSP refuses it. The app still worked, so no test failed | Reading the browser console during a manual check of the Docker stack | Zod's `jitless` setting, in a file imported first. The first attempt put it too late and the error stayed. E2E now fails on any console error |
-| The E2E search test assumed every result has the search term in its **title**, but the rule also matches description and category | Re-reading the test against assumption A3 | Each result is checked against the full rule |
-| A config test expected two Zod error messages together, but Zod 4 skips object-level checks when a field has already failed | Re-reading before running | Split into two tests |
+| It created the repo in my work projects folder and committed with the machine's global git identity. | I noticed and stopped it. | Moved the repo and set my personal git identity for this repo only. |
+| Product images were loading from Fake Store's own server. All product data went through our API, but the agent treated images as "just assets" and allowed them. The brief says the client must not call Fake Store, and anyone opening the network tab would have seen it. | The check against the brief (prompt 5). | The API now serves images itself at `/api/products/:id/image`. The browser is only allowed to talk to our own site, and the E2E test fails if it talks to anything else. |
+| A test was passing for the wrong reason. The "same rating, more reviews wins" test stayed green even with that rule deleted, because in the test data the product with more reviews also happened to have the lower id. | Breaking the code on purpose (see below). | Changed the test data so only the review-count rule gives the right order. |
+| When the mail server was down, the log just said "could not send your enquiry" with an empty reason. Node reports a refused connection to `localhost` as an error with a blank message. | Running the app with the mail server switched off and reading the log. | The email adapter now logs the real reasons (connection refused on both IPv6 and IPv4). |
+| A test setting was silently ignored. The mocking library (MSW 3) had renamed the option that makes tests fail on unexpected requests. With the old name, those requests would only have printed a warning. | The typecheck flagged it. | Switched to the new name and confirmed tests now fail when they should. |
+| Every page logged a security error. Zod (the validation library) quietly tries a trick our security policy blocks. The site still worked, so no test noticed. | Looking at the browser console while checking the site by hand. | Turned that Zod feature off. The first fix didn't work because it ran too late; the second did. The E2E test now fails on any console error. |
+| An E2E test assumed every search result has the search word in its title, but search also matches descriptions and categories. | Re-reading the test against assumption A3. | The test now checks each result against the full rule. |
+| A config test expected two error messages at once, but Zod skips some checks once a field has already failed. | Re-reading it before running. | Split it into two tests. |
 
 ## How the output was checked
-- **Mutation checks.** When all 81 API tests passed on the first run, the agent didn't take that as success.
-  It broke the code on purpose (logging customer details, ignoring the rate limit, leaking error messages,
-  dropping the stale-cache fallback, allowing SVG images, and more) and confirmed a test failed each
-  time. That is how the wrong-reason test above was found. The same was done for the web tests and the
-  image endpoint.
-- **Runs against the real thing**, by the agent, with me reviewing the results:
-  - every API route against Fake Store;
-  - the enquiry email in Mailpit (right recipient and reply-to, and the product title taken from our
-    catalogue, not from the browser);
-  - no customer details in the API or container logs;
-  - a forged `X-Forwarded-For` header can't get round the enquiry rate limit;
-  - pages checked on desktop and mobile;
-  - a fresh checkout passes the full test run.
-- **Newer library versions than the agent expected** (TypeScript 6, Vitest 5, ESLint 10, React Router 8,
-  MSW 3, Zod 4). It checked installed APIs before using them, but two problems still got through and were
-  only caught by the typecheck and the browser console. That's why both are now part of the checks, and
-  why these traps are listed in `AGENTS.md`.
+
+When all 81 API tests passed on the very first run, the agent didn't trust it. It broke the code on
+purpose in a handful of places (logging customer details, ignoring the rate limit, leaking error
+messages, allowing SVG images and so on) and made sure a test failed every time. That's how it found the
+test that was passing for the wrong reason. It did the same for the web tests and the image endpoint.
+
+The agent also tried things against the real services, and I went through the results:
+- every API route against Fake Store;
+- the enquiry email arriving in Mailpit with the right recipient and reply-to, and the product name taken
+  from our catalogue rather than from the browser;
+- no customer details in any logs;
+- a faked `X-Forwarded-For` header can't get round the enquiry rate limit;
+- the pages on desktop and mobile;
+- a fresh checkout passing the full test run.
+
+The libraries were newer than the versions the agent knew best (TypeScript 6, Vitest 5, ESLint 10,
+React Router 8, MSW 3, Zod 4). It looked up the installed APIs instead of guessing, but two problems still
+slipped through and only showed up in the typecheck and the browser console. That's why both are part of
+the checks now, and why those traps are written down in `AGENTS.md`.
