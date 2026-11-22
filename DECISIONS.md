@@ -13,6 +13,38 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
 - **A4. The sales inbox is one address**, set by `SALES_INBOX_EMAIL`. Locally it is caught by Mailpit.
 - **A5. Contact details** are name and email (required), phone and message (optional). The enquiry is
   emailed, not stored.
+- **A6. A product's category is `{slug, name}`.** The slug (`mens-clothing`) is derived from Fake Store's
+  category string for URLs; the name only gets a capital first letter. Fake Store's spelling
+  ("Jewelery") is kept rather than corrected by hand in the adapter.
+- **A7. Prices are shown as the source gives them, with a `$`.** No currency or tax handling.
+- **A8. An enquiry for a product that doesn't exist is a 400 on `productId`**, not a 404: the route exists,
+  the input is wrong, and the form can show it as a field error. No email is sent.
+- **A9. If a featured id disappears from the source, the home page shows the rest** and the API logs a
+  warning with the missing ids, rather than failing the whole page.
+- **A10. Search results keep catalogue order.** No relevance ranking; with 20 products it isn't needed.
+- **A11. Enquiries are limited to 5 per minute per client IP** by default (`ENQUIRY_RATE_LIMIT_PER_MINUTE`).
+  Catalogue reads are not rate limited.
+
+## Technical decisions
+- **D1. The `ProductSource` port is small** (`listProducts`, `listCategories`, `getProduct`) and the rules
+  (featured order, top-rated split, search matching) live in `CatalogueService`, working on the full list
+  in memory. Right for 20 products and easy to test. When the source is large, move search and
+  category filtering into the port; the service and routes don't change.
+- **D2. The Fake Store adapter reads `/products` once and caches it** (TTL, default 5 min). Concurrent misses
+  share one request, failures are not cached, and if a refresh fails the stale list is served. Single
+  products come from the cached list because Fake Store answers `/products/<unknown id>` with 200 and
+  an empty body (checked 2026-11-22), so it can't signal "not found".
+- **D3. Upstream items that fail validation are skipped and logged**, not allowed to fail the whole catalogue.
+- **D4. Validation is an explicit `parseInput(schema, input)` call in each handler**, using the contract
+  schemas, instead of a Fastify type-provider plugin: one obvious error path, easy to read and change.
+- **D5. Error messages on `AppError` are safe for clients; internal detail goes in `cause`**, which is logged
+  and never sent. SMTP failures are rewritten into a readable cause (Node reports a refused
+  `localhost` connection as an `AggregateError` with an empty message).
+- **D6. `packages/contracts` is consumed as TypeScript source**, with no build step. The API is bundled with
+  esbuild for production (`npm run build -w @catalogue/api`), which inlines it; the web app will get it
+  through Vite the same way.
+- **D7. Request hardening:** 16 KB body limit, a `x-request-id` response header that matches the request id
+  in the logs, and timeouts on every outbound call (Fake Store 5 s, SMTP 10 s).
 
 ## Dropped or simplified
 _To be completed._

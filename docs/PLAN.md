@@ -44,15 +44,15 @@ Rules:
 | GET | `/api/health` | `{status:"ok"}` | liveness, no upstream calls |
 | GET | `/api/categories` | `Category[]` (`{slug, name}`) | |
 | GET | `/api/products/featured` | `Product[]` (5) | owner-chosen ids, in configured order (A1) |
-| GET | `/api/categories/:slug/products` | `{topRated: Product[], more: Product[]}` | top 3 by rating, rest by rating desc (A2) |
+| GET | `/api/categories/:slug/products` | `{category, topRated: Product[], more: Product[]}` | top 3 by rating, rest by rating desc (A2); 404 if unknown |
 | GET | `/api/products/search?q=` | `Product[]` | `q` trimmed, 1-100 chars; matches title, description, category (A3) |
 | GET | `/api/products/:id` | `Product` | 404 if unknown |
-| POST | `/api/enquiries` | `202 {enquiryId}` | body validated; product looked up server-side (A5) |
+| POST | `/api/enquiries` | `202 {enquiryId}` | body validated; product looked up server-side (A5); unknown product is a 400 on `productId` (A8) |
 
 Errors use one shape: `{error: {code, message, details?}}`. 400 validation, 404 not found,
 429 rate limited, 502 upstream (Fake Store) failure, 500 otherwise. No stack traces leak.
 
-`Product`: `{id, title, price, description, category, imageUrl, rating: {rate, count}}`.
+`Product`: `{id, title, price, description, category: {slug, name}, imageUrl, rating: {rate, count}}` (A6).
 `EnquiryRequest`: `{productId, name (1-100), email, phone? , message? (<=1000)}`.
 
 ## Client pages
