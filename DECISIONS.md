@@ -76,10 +76,47 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
   retries once. With more time: a recorded Fake Store stub for CI, live checks on a schedule.
 
 ## Dropped or simplified
-_To be completed._
+- **Enquiries are emailed, not stored.** The criterion only asks for an email and a thank-you. No database
+  keeps the PoC to one command with nothing to migrate. Each enquiry has an id (in the email and the
+  thank-you message) so a store can be added later without changing the contract.
+- **No admin UI for featured products.** The owner's 5 picks are config (`FEATURED_PRODUCT_IDS`), validated at
+  startup. Enough to prove the behaviour; an admin screen needs auth, which is out of scope.
+- **No auth, pagination, i18n, analytics or production deployment.** 20 products don't need pagination;
+  the rest isn't needed to judge the PoC. The infrastructure is AWS-compatible but not deployed.
+- **Search is a substring match done in memory**, not a search engine. Right for 20 products; see below.
+- **No CAPTCHA or spam filtering on enquiries**; per-IP rate limiting, a body size limit and strict
+  validation are the basic protection for now.
+- **The UI is deliberately plain.** The creative work is in progress, so effort went into making the look
+  replaceable (tokens) and accessible (labels, roles, focus states), not into a visual design.
 
 ## How the design grows beyond the PoC
-_To be completed._
+- **New product source** (PIM, commerce platform, database): write one adapter that implements
+  `ProductSource` and maps its shape to `Product`; change one line in `apps/api/src/server.ts`. Routes,
+  services, contracts and the web app don't change. For a large catalogue, push search and category
+  filtering into the port (`search(term)`, `listByCategory(slug)`) and back it with a search engine; the
+  service and HTTP API keep their shape.
+- **New email provider** (SES, SendGrid): implement `EmailSender`. For reliability, put a queue between the
+  enquiry service and the sender (SQS + worker) so a provider outage doesn't lose enquiries or slow
+  customers down; the API would still answer 202.
+- **New look and feel**: replace `apps/web/src/styles/tokens.css`, then restyle the one stylesheet.
+  Components are presentational and data fetching lives in hooks, so they can be swapped or moved to
+  a component library page by page.
+- **Persistence and admin**: store enquiries (DynamoDB or Postgres) for tracking and auditing; move featured
+  products from config to data with an authenticated admin screen.
+- **Deployment on AWS**: `web` to S3 + CloudFront (or nginx on ECS), `api` to ECS/Fargate or Lambda (Fastify
+  has a Lambda adapter), config from SSM/Secrets Manager, SES for email. The cache moves to a shared
+  store (ElastiCache) once there is more than one API instance, as does the rate limit.
+- **Observability**: logs are already structured JSON with a request id that is also returned to the client
+  (`x-request-id`), so they can go straight to CloudWatch, Datadog or Sumo Logic. Next: metrics for
+  upstream latency/errors and enquiry success, plus alerts on 502 rates.
+- **Contracts**: the shared Zod schemas can generate an OpenAPI document for other consumers (a mobile app,
+  partners) when the API is opened up.
 
 ## Next, with another day
-_To be completed._
+1. A Fake Store stub for CI (recorded responses), so the E2E suite doesn't depend on a public service;
+   keep a scheduled live check.
+2. A queue for outgoing enquiry emails with retries, and store each enquiry.
+3. OpenAPI generated from the contracts, served at `/api/docs`.
+4. Accessibility pass with axe in the E2E suite, and visual checks once the design arrives.
+5. Metrics and alerts (upstream errors, enquiry failures), and a deploy pipeline to an AWS environment.
+6. Show product images through our own CDN/image service instead of the source's host (A12).
