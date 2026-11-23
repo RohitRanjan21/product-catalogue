@@ -106,16 +106,26 @@ npm run lint && npm run typecheck && npm test   # 138 tests, ~5 seconds, no netw
 docker compose up --build -d --wait && npm run test:e2e   # Playwright against the running stack
 ```
 
+The second line runs against the real Fake Store. To run the E2E suite exactly as CI does, with a
+recorded copy of the catalogue instead (no internet needed for products):
+
+```bash
+docker compose -f docker-compose.yml -f e2e/docker-compose.stub.yml up --build -d --wait && npm run test:e2e
+```
+
 | Level | Where | What it covers |
 |---|---|---|
 | Contract | `packages/contracts` (19) | Input rules: enquiry strictness, search term, product id |
 | Unit + adapter | `apps/api/src/**/*.test.ts` | Featured order, top-rated split and tie-breaks, search matching, config validation, enquiry email content, Fake Store mapping/cache/timeout/failures and image checks (type, size; stubbed `fetch`), SMTP failures |
 | Integration | `apps/api/test/app.test.ts` | Every route through Fastify with in-memory fakes: success, 400, 404, 413, 429, 502, 500, no stack leaks, no source image URLs or customer details leaking |
 | Component | `apps/web/src/**/*.test.tsx` (23) | The acceptance criteria in the UI, with MSW standing in for the API; unhandled requests fail the test |
-| End to end | `e2e/tests` (5) | Real stack and real Fake Store: home → category → product → enquiry → thank you, the email arriving in Mailpit, search, images loading through our API, CSP, and no request to any other host or console error |
+| End to end | `e2e/tests` (5) | The real stack in Docker: home → category → product → enquiry → thank you, the email arriving in Mailpit, search, images loading through our API, CSP, and no request to any other host or console error |
 
 CI (`.github/workflows/ci.yml`) runs lint, typecheck, tests and build on every pull request, then the
-end-to-end suite against Docker Compose.
+end-to-end suite against Docker Compose. Fake Store blocks GitHub's runners (HTTP 403), so in CI the
+stack gets a small stand-in that serves a recorded copy of the real catalogue
+(`e2e/docker-compose.stub.yml`); everything else is the real stack. Locally, the suite passes against
+the real Fake Store too. Details in `DECISIONS.md` (D14).
 
 ## Developing without Docker
 
@@ -134,7 +144,7 @@ npm run dev:web                   # http://localhost:5173, proxies /api to the A
 packages/contracts   Zod schemas: the API contract shared by both sides
 apps/api             Fastify API: config, ports, adapters (Fake Store, SMTP), services, routes
 apps/web             React SPA: pages, components, src/api hooks, design tokens; nginx config
-e2e                  Playwright tests against the Compose stack
+e2e                  Playwright tests against the Compose stack, plus the Fake Store stand-in CI uses
 docs/PLAN.md         The spec the work was built from
 ```
 

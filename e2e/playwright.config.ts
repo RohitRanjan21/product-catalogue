@@ -1,8 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Runs against the real stack started with `docker compose up --build` (web, API, Mailpit) and the
- * real Fake Store. Override the URLs to point at another environment.
+ * Runs against the stack started with `docker compose up --build` (web, API, Mailpit), which uses the
+ * real Fake Store. CI adds `e2e/docker-compose.stub.yml` to swap in a recorded copy, because Fake Store
+ * blocks cloud runners (DECISIONS.md D14). Override the URLs to point at another environment.
  */
 export default defineConfig({
   testDir: './tests',

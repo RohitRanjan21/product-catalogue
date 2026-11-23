@@ -34,6 +34,10 @@ jobs:
     needs: checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Fake Store answers 403 to GitHub's runners, so every `docker compose` command in this job adds
+      # a stand-in that serves a recorded copy of the catalogue (DECISIONS.md D14).
+      COMPOSE_FILE: docker-compose.yml:e2e/docker-compose.stub.yml
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

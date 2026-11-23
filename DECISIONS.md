@@ -74,9 +74,18 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
 - **D13. Zod runs in `jitless` mode in the browser.** Zod 4 probes `new Function()` for speed; the CSP refuses
   it and logs a violation on every page. The flag is set in `src/zod-setup.ts`, imported first, because
   Zod reads it when schemas are created. The E2E test fails on any console error, so this stays fixed.
-- **D14. E2E runs against the real stack and the real Fake Store.** That is what the reviewer runs, and it
-  checks the email in Mailpit through its API. The trade-off is a dependency on a free public service; CI
-  retries once. With more time: a recorded Fake Store stub for CI, live checks on a schedule.
+- **D14. E2E runs against the real stack; in CI, Fake Store is replaced by a recorded stand-in.** Locally,
+  `docker compose up` uses the real Fake Store, which is what the reviewer runs, and the suite passes
+  against it. In CI it can't: Fake Store sits behind Cloudflare, which answered every request from
+  GitHub's runners with HTTP 403 on the first CI run (it blocks cloud IPs). So CI adds
+  `e2e/docker-compose.stub.yml`, which starts a small dependency-free server
+  (`e2e/fake-store-stub/server.mjs`) serving a recorded copy of the real catalogue and placeholder images,
+  and points `FAKESTORE_BASE_URL` at it. Everything else is the real stack: nginx, the API with its real
+  adapter, cache and image proxy, Mailpit. In that mode the API container can't resolve
+  `fakestoreapi.com` at all, so the CI run can't quietly depend on it. This is the port/adapter split
+  paying off: the product source is swapped by config alone. The trade-off: CI won't notice if Fake
+  Store changes its shape; the adapter's unit tests cover malformed data, and a scheduled live check
+  would cover the rest (see "Next").
 
 ## Dropped or simplified
 - **Enquiries are emailed, not stored.** The criterion only asks for an email and a thank-you. No database
@@ -116,8 +125,8 @@ Filled in as the build goes. Assumption ids are referenced from docs/PLAN.md.
   partners) when the API is opened up.
 
 ## Next, with another day
-1. A Fake Store stub for CI (recorded responses), so the E2E suite doesn't depend on a public service;
-   keep a scheduled live check.
+1. A scheduled live check against the real Fake Store (from a host it doesn't block), to catch changes
+   in its data shape that the recorded CI copy can't.
 2. A queue for outgoing enquiry emails with retries, and store each enquiry.
 3. OpenAPI generated from the contracts, served at `/api/docs`.
 4. Accessibility pass with axe in the E2E suite, and visual checks once the design arrives.

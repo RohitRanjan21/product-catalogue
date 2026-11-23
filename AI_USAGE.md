@@ -75,6 +75,7 @@ problem (images, see below) and a couple of small gaps, which I had it fix.
 | Every page logged a security error. Zod (the validation library) quietly tries a trick our security policy blocks. The site still worked, so no test noticed. | Looking at the browser console while checking the site by hand. | Turned that Zod feature off. The first fix didn't work because it ran too late; the second did. The E2E test now fails on any console error. |
 | An E2E test assumed every search result has the search word in its title, but search also matches descriptions and categories. | Re-reading the test against assumption A3. | The test now checks each result against the full rule. |
 | A config test expected two error messages at once, but Zod skips some checks once a field has already failed. | Re-reading it before running. | Split it into two tests. |
+| The E2E suite depended on the real Fake Store, and the CI job had never actually run. Fake Store blocks GitHub's servers, so on the first CI run every product request got HTTP 403 and 4 of the 5 E2E tests failed. Locally they had all passed. | The first CI run after pushing. The API's logs in the job said exactly why. | In CI, a small stand-in now serves a recorded copy of the real catalogue, and the API is pointed at it by config alone. Locally, the suite still runs against the real Fake Store. |
 
 ## How the output was checked
 

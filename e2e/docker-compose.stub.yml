@@ -1,0 +1,29 @@
+# Adds a stand-in for Fake Store and points the API at it. Used by CI, where Fake Store answers 403
+# (it blocks cloud runners). Paths are relative to the project root, as with any second -f file:
+#
+#   docker compose -f docker-compose.yml -f e2e/docker-compose.stub.yml up --build -d --wait
+#
+# Without this file, the stack uses the real Fake Store. See DECISIONS.md D14.
+services:
+  fake-store:
+    image: node:22-alpine
+    user: node
+    command: ["node", "/stub/server.mjs"]
+    volumes:
+      - ./e2e/fake-store-stub:/stub:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # No published port: only the API talks to it.
+
+  api:
+    environment:
+      FAKESTORE_BASE_URL: http://fake-store:3001
+    # Make the real Fake Store unreachable, so a run with this file can't quietly depend on it.
+    extra_hosts:
+      - "fakestoreapi.com:127.0.0.1"
+    depends_on:
+      fake-store:
+        condition: service_healthy

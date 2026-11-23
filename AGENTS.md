@@ -46,6 +46,7 @@ Node 22 comes from nvm and is not on PATH in non-interactive shells: start comma
 | Gate (must pass) | `npm run lint && npm run typecheck && npm test` |
 | Run everything | `docker compose up --build` (site :8080, Mailpit inbox :8025) |
 | E2E (stack running) | `npm run test:e2e` |
+| Stack as CI runs it (Fake Store stand-in) | `docker compose -f docker-compose.yml -f e2e/docker-compose.stub.yml up --build -d --wait` |
 | Dev servers | `docker compose up mailpit -d`, then `npm run dev:api` and `npm run dev:web` (:5173) |
 | Add a dependency | `npm i <pkg> -w @catalogue/<api\|web\|contracts\|e2e>`; check it landed in that `package.json` |
 
@@ -60,6 +61,9 @@ Node 22 comes from nvm and is not on PATH in non-interactive shells: start comma
   every page. Object-level `.refine` does not run when a field already failed.
 - **Fake Store** answers `/products/<unknown id>` with 200 and an empty body. Look products up in the
   cached list (the adapter does this).
+- **Fake Store blocks cloud runners** (Cloudflare answers 403 from GitHub Actions). CI's E2E job uses
+  `e2e/docker-compose.stub.yml` (a recorded copy in `e2e/fake-store-stub/`). If you change what the
+  adapter reads from Fake Store, update the stand-in and re-record `products.json` from the real API.
 - **Node's `fetch`/SMTP to `localhost`** tries IPv6 and IPv4 and fails with an `AggregateError` whose
   message is empty; read `.errors` (see `describeSmtpFailure`).
 - **npm workspaces:** the first `npm i -w <new workspace>` after creating its `package.json` can link the
