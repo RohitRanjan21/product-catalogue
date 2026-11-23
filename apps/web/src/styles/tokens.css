@@ -1,0 +1,44 @@
+/*
+ * Design tokens: the whole look and feel in one file. The creative work is still in progress,
+ * so components only use these variables; a new brand replaces this file, not the components.
+ */
+:root {
+  /* Colour */
+  --color-bg: #f6f7f9;
+  --color-surface: #ffffff;
+  --color-text: #1b1f24;
+  --color-text-muted: #5b6470;
+  --color-border: #dde1e6;
+  --color-brand: #0b5cad;
+  --color-brand-strong: #084a8c;
+  --color-on-brand: #ffffff;
+  --color-accent: #b4410f;
+  --color-danger: #b42318;
+  --color-danger-bg: #fdecea;
+  --color-success: #146c2e;
+  --color-success-bg: #e7f6ec;
+  --color-focus: #f2a900;
+
+  /* Type */
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-size-sm: 0.875rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.75rem;
+  --font-weight-bold: 650;
+  --line-height: 1.5;
+
+  /* Space, shape, depth */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 3px rgb(16 24 40 / 0.1);
+  --content-width: 72rem;
+  --card-min-width: 13rem;
+  --image-height: 11rem;
+}
